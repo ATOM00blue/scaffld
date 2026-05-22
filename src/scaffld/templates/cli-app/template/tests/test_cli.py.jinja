@@ -1,0 +1,16 @@
+from typer.testing import CliRunner
+
+from {{ package_name }}.cli import app
+
+runner = CliRunner()
+
+
+def test_hello():
+    result = runner.invoke(app, ["hello", "scaffld"])
+    assert result.exit_code == 0
+    assert "Hello, scaffld" in result.stdout
+
+
+def test_version():
+    result = runner.invoke(app, ["--version"])
+    assert result.exit_code == 0

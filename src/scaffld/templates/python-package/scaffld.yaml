@@ -1,0 +1,48 @@
+name: python-package
+description: A modern Python package — src layout, pyproject, pytest, ruff, CI, optional Typer CLI.
+
+variables:
+  project_name:
+    type: str
+    prompt: "Project name"
+    default: "My Package"
+  package_name:
+    type: str
+    prompt: "Import/package name"
+    default: "{{ project_name | snake }}"
+  description:
+    type: str
+    prompt: "Short description"
+    default: "A modern Python package."
+  author:
+    type: str
+    prompt: "Author name"
+    default: "Your Name"
+  license:
+    type: choice
+    prompt: "License"
+    choices: [MIT, Apache-2.0, None]
+    default: MIT
+  python_min:
+    type: choice
+    prompt: "Minimum Python version"
+    choices: ["3.9", "3.10", "3.11", "3.12"]
+    default: "3.9"
+  use_cli:
+    type: bool
+    prompt: "Add a Typer command-line entry point?"
+    default: false
+
+skip:
+  - when: "not use_cli"
+    paths:
+      - "src/{{ package_name }}/cli.py"
+  - when: "license == 'None'"
+    paths:
+      - "LICENSE"
+
+hooks:
+  post_gen:
+    - name: "Initialize git repository"
+      run: "git init -q && git add -A"
+      when: "true"

@@ -1,0 +1,24 @@
+# {{ site_title }}
+
+{{ tagline }}
+
+A static site scaffolded with [scaffld](https://github.com/ATOM00blue/scaffld).
+
+## Develop
+
+Open `index.html` directly, or serve locally:
+
+```bash
+python -m http.server 8000
+```
+
+Then visit http://localhost:8000.
+{% if deploy_pages %}
+## Deploy
+
+Pushing to `main` deploys to GitHub Pages automatically
+(see `.github/workflows/pages.yml`). Enable Pages → "GitHub Actions" in repo settings.
+{% endif %}
+## License
+
+© 2026 {{ author }}

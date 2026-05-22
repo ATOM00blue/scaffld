@@ -1,0 +1,35 @@
+# {{ project_name }}
+
+{{ description }}
+
+## Install
+
+```bash
+pip install -e ".[dev]"
+```
+
+## Usage
+
+```python
+from {{ package_name }}.core import greet
+
+print(greet("you"))
+```
+{% if use_cli %}
+### CLI
+
+```bash
+{{ package_name | kebab }} hello you
+```
+{% endif %}
+## Develop
+
+```bash
+pytest
+ruff check .
+```
+{% if license != "None" %}
+## License
+
+{{ license }} © {{ author }}
+{% endif %}

@@ -1,0 +1,93 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "scaffld"
+version = "0.1.0"
+description = "Scaffold projects from composable templates with variables and post-generation hooks."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "ATOM00blue" }]
+keywords = [
+    "scaffolding",
+    "cli",
+    "templates",
+    "generator",
+    "cookiecutter",
+    "boilerplate",
+    "jinja2",
+    "developer-tools",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+dependencies = [
+    "typer>=0.12",
+    "jinja2>=3.1",
+    "questionary>=2.0",
+    "rich>=13.0",
+    "PyYAML>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ATOM00blue/scaffld"
+Repository = "https://github.com/ATOM00blue/scaffld"
+Issues = "https://github.com/ATOM00blue/scaffld/issues"
+Changelog = "https://github.com/ATOM00blue/scaffld/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+scaffld = "scaffld.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scaffld"]
+# Templates contain dotfiles (.gitignore, .github/) and files without a .py
+# extension; tell hatchling to ship everything under templates/ verbatim.
+artifacts = ["src/scaffld/templates/**"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/scaffld",
+    "tests",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011"]
+# Typer requires calling typer.Option/Argument in parameter defaults (B008).
+"src/scaffld/cli.py" = ["B008"]

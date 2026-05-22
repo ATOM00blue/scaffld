@@ -1,0 +1,29 @@
+name: cli-app
+description: A polished command-line app — Typer + rich, packaged, console entry point, tests.
+
+variables:
+  app_name:
+    type: str
+    prompt: "App name (shown in --help)"
+    default: "My CLI"
+  command:
+    type: str
+    prompt: "Command users will type"
+    default: "{{ app_name | kebab }}"
+  package_name:
+    type: str
+    default: "{{ command | snake }}"
+  description:
+    type: str
+    prompt: "Short description"
+    default: "A delightful command-line app."
+  author:
+    type: str
+    prompt: "Author name"
+    default: "Your Name"
+
+hooks:
+  post_gen:
+    - name: "Initialize git repository"
+      run: "git init -q && git add -A"
+      when: "true"

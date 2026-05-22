@@ -1,0 +1,19 @@
+"""Command-line interface for {{ project_name }}."""
+
+from __future__ import annotations
+
+import typer
+
+from .core import greet
+
+app = typer.Typer(help="{{ description }}")
+
+
+@app.command()
+def hello(name: str = typer.Argument("world", help="Who to greet.")) -> None:
+    """Print a greeting."""
+    typer.echo(greet(name))
+
+
+if __name__ == "__main__":
+    app()

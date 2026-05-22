@@ -1,0 +1,35 @@
+name: static-site
+description: A minimal static website — semantic HTML, modern CSS, optional GitHub Pages deploy.
+
+variables:
+  site_title:
+    type: str
+    prompt: "Site title"
+    default: "My Site"
+  tagline:
+    type: str
+    prompt: "Tagline"
+    default: "Built with scaffld."
+  author:
+    type: str
+    prompt: "Author name"
+    default: "Your Name"
+  accent:
+    type: str
+    prompt: "Accent color (CSS)"
+    default: "#4f46e5"
+  deploy_pages:
+    type: bool
+    prompt: "Add a GitHub Pages deploy workflow?"
+    default: true
+
+skip:
+  - when: "not deploy_pages"
+    paths:
+      - ".github/workflows/pages.yml"
+
+hooks:
+  post_gen:
+    - name: "Initialize git repository"
+      run: "git init -q && git add -A"
+      when: "true"

@@ -1,0 +1,52 @@
+"""Command-line interface for {{ app_name }}."""
+
+from __future__ import annotations
+
+import typer
+from rich.console import Console
+from rich.panel import Panel
+
+from . import __version__
+
+app = typer.Typer(
+    name="{{ command }}",
+    help="{{ description }}",
+    add_completion=False,
+    no_args_is_help=True,
+)
+console = Console()
+
+
+def _version(value: bool) -> None:
+    if value:
+        console.print("{{ command }} " + __version__)
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False, "--version", "-V", callback=_version, is_eager=True, help="Show version."
+    ),
+) -> None:
+    """{{ app_name }}."""
+
+
+@app.command()
+def hello(
+    name: str = typer.Argument("world", help="Who to greet."),
+    excited: bool = typer.Option(False, "--excited", "-e", help="Add some energy."),
+) -> None:
+    """Greet someone."""
+    suffix = "!!!" if excited else "."
+    console.print(
+        Panel.fit(
+            f"[bold cyan]Hello, {name}{suffix}[/]",
+            title="{{ app_name }}",
+            border_style="cyan",
+        )
+    )
+
+
+if __name__ == "__main__":
+    app()

@@ -1,0 +1,36 @@
+:root {
+  --accent: {{ accent }};
+  --fg: #1a1a2e;
+  --bg: #ffffff;
+  --muted: #6b7280;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  line-height: 1.6;
+}
+
+.hero {
+  padding: 6rem 1.5rem 4rem;
+  text-align: center;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000));
+  color: white;
+}
+
+.hero h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.5rem); }
+.tagline { margin: 0.5rem 0 0; opacity: 0.9; }
+
+main { max-width: 720px; margin: 0 auto; padding: 3rem 1.5rem; }
+main a { color: var(--accent); }
+
+footer {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  border-top: 1px solid #eee;
+}
