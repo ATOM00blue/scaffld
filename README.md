@@ -212,8 +212,44 @@ extends: [python-package]   # render python-package first, then this on top
 
 Hooks run **after** rendering, in the generated directory, through your platform shell
 (so the same `run:` line works on Windows, macOS and Linux for common commands). Each
-hook has an optional `when:` Jinja condition. Skip them entirely with `--no-hooks`, and
-they always show up in `--dry-run` so you can see what *would* run.
+hook has an optional `when:` Jinja condition. They always show up in `--dry-run` so you
+can see what *would* run.
+
+Because hooks execute **arbitrary commands defined by the template author**, scaffld
+**asks for your explicit consent** before running them and shows you the exact commands
+first. Decline and the project is still generated — only the commands are skipped.
+
+- `--yes` / `-y` — consent to run hooks without the prompt (use only for templates you trust).
+- `--no-hooks` — never run hooks (wins over `--yes`).
+- `--no-input` (CI) — hooks are **not** run unless you also pass `--yes`.
+
+See [Security & trust model](#security--trust-model) below.
+
+## Security & trust model
+
+**A template is code.** scaffld can fetch templates from arbitrary git URLs and a
+template author controls file contents, file/directory *names*, and post-generation
+*commands*. Treat any template you did not write like any other untrusted code: only
+run templates from sources you trust.
+
+scaffld defends you with three layers:
+
+1. **Sandboxed rendering.** Templates render in a Jinja2 `SandboxedEnvironment`, which
+   blocks the standard template-injection escapes (`__class__`, `__globals__`, …). A
+   malicious template cannot execute Python through rendering alone.
+2. **Destination confinement (no path traversal / ZIP-SLIP).** Every rendered output
+   path is validated to stay **inside** the destination directory. Absolute paths,
+   Windows drive/UNC paths, and any `..` traversal are rejected before anything is
+   written — a template can never write outside the folder you chose.
+3. **Explicit consent for hooks.** Post-generation hooks run arbitrary shell commands.
+   scaffld shows them and requires your confirmation (or an explicit `--yes`) before
+   running any. In non-interactive/CI mode, hooks are skipped unless you opt in with
+   `--yes`. Use `--no-hooks` to disable them entirely.
+
+**`extends` inherits trust.** Composing a template via `extends` pulls in (and may clone)
+its base templates; you are trusting the *entire* chain, not just the top-level template.
+
+To report a security issue, please open a private advisory on the GitHub repository.
 
 ## CLI reference
 
@@ -232,7 +268,8 @@ Options for `new`:
 | `--no-input` | Never prompt; use defaults + `--var` (CI mode) |
 | `--dry-run` | Preview the tree and hooks; write nothing |
 | `--force`, `-f` | Overwrite existing files |
-| `--no-hooks` | Skip post-generation hooks |
+| `--no-hooks` | Skip post-generation hooks (wins over `--yes`) |
+| `--yes`, `-y` | Consent to run hooks without prompting (trusted templates) |
 | `--ref REF` | Git branch/tag/commit for git URL templates |
 
 ## Examples
@@ -261,7 +298,9 @@ No. scaffld is focused on *creating* projects. If you need to keep a project in 
 an evolving template over time, copier is the right tool.
 
 **Where do hooks run?**
-In the freshly generated directory, through your shell. Use `--no-hooks` to skip them.
+In the freshly generated directory, through your shell — but only after you approve the
+exact commands (or pass `--yes`). Use `--no-hooks` to skip them entirely. See
+[Security & trust model](#security--trust-model).
 
 **Can I use a private git template?**
 Yes — if your `git` is configured with credentials/SSH for that repo, scaffld clones it

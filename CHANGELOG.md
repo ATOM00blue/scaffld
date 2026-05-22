@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Security
+
+- **Path traversal / ZIP-SLIP (Critical):** rendered file and directory names, and
+  `skip` paths, are now confined to the destination directory. Absolute paths,
+  Windows drive/UNC paths, and any `..` traversal are rejected before writing, with a
+  defense-in-depth `realpath` containment check in the writer. A malicious template
+  can no longer write outside the chosen output directory.
+- **Template injection / SSTI (Critical):** rendering now uses a Jinja2
+  `SandboxedEnvironment`, blocking the standard `__class__`/`__globals__` escape chain
+  so untrusted templates cannot execute code at render time.
+- **Hook RCE without consent (Critical):** post-generation hooks (arbitrary shell
+  commands from the template) now require **explicit consent**. The CLI shows the exact
+  commands and prompts before running; non-interactive/CI runs skip hooks unless
+  `--yes` is given. Added `--yes`/`-y`. `--no-hooks` still wins.
+- **git argument injection hardening (Medium):** `git clone` now uses a `--`
+  end-of-options separator and rejects URLs/refs/subdirs beginning with `-` or
+  containing `..`.
+- Replaced a bare `assert` (stripped under `python -O`) with an explicit error.
+
+### Added
+
+- New `--yes`/`-y` flag and an interactive hook-consent prompt.
+- Prominent "Security & trust model" section in the README.
+- Regression tests for path-traversal rejection, SSTI sandboxing, hook consent, and
+  git argument-injection hardening; `SECURITY_REVIEW.md` documenting the audit.
+
 ## [0.1.0] - 2026-05-22
 
 ### Added
