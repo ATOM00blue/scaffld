@@ -98,6 +98,49 @@ def _hook_echo(hook) -> None:
     )
 
 
+def _make_hook_consent(*, assume_yes: bool, no_input: bool):
+    """Build the consent callback the generator calls before running hooks.
+
+    SECURITY: post-gen hooks are arbitrary shell commands from an untrusted
+    template, so they require explicit consent.
+
+    * ``--yes`` grants consent non-interactively.
+    * ``--no-input`` (CI) WITHOUT ``--yes`` declines — automation never runs
+      untrusted commands implicitly.
+    * Otherwise, the exact commands are shown and the user is asked to confirm
+      (declining still writes the project, just skips the commands).
+    """
+
+    def consent(runnable: list) -> bool:
+        console.print()
+        console.print(
+            f"[scaffld.warn]{SYMBOLS['warn']}[/] This template wants to run "
+            f"{len(runnable)} post-generation command(s) on your machine:"
+        )
+        for hook in runnable:
+            console.print(
+                f"  [scaffld.accent]{SYMBOLS['arrow']}[/] {hook.name}: "
+                f"[scaffld.dim]{hook.command}[/]"
+            )
+        if assume_yes:
+            return True
+        if no_input:
+            console.print(
+                "[scaffld.warn]Skipping hooks[/] (non-interactive; pass "
+                "[scaffld.accent]--yes[/] to run them)."
+            )
+            return False
+        console.print(
+            "[scaffld.dim]Only run hooks from templates you trust.[/]"
+        )
+        try:
+            return typer.confirm("Run these commands?", default=False)
+        except (EOFError, KeyboardInterrupt):  # pragma: no cover - interactive
+            return False
+
+    return consent
+
+
 @app.command()
 def new(
     template: str = typer.Argument(
@@ -121,6 +164,12 @@ def new(
     no_hooks: bool = typer.Option(
         False, "--no-hooks", help="Do not run post-generation hooks."
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Consent to run post-generation hooks without prompting (I trust this template).",
+    ),
     ref: str | None = typer.Option(
         None, "--ref", help="Git branch/tag for git URL templates."
     ),
@@ -140,6 +189,7 @@ def new(
             git_ref=ref,
             prompter=None if no_input else Prompter(),
             hook_echo=_hook_echo,
+            hook_consent=_make_hook_consent(assume_yes=yes, no_input=no_input),
         )
     except ScaffldError as exc:
         error(str(exc))

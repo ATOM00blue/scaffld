@@ -35,8 +35,14 @@ def run_hooks(planned: list, cwd: Path, *, echo=None) -> None:
     """Run planned hooks (those with ``will_run``) in *cwd*.
 
     Each command is executed through the platform shell so that user-authored
-    hooks behave the same way they would when typed into a terminal. We rely on
-    the shell only for parsing; commands run with ``cwd`` set to the output dir.
+    hooks behave the same way they would when typed into a terminal (so a single
+    ``run:`` line with ``&&``/pipes works across platforms). We rely on the shell
+    only for parsing; commands run with ``cwd`` set to the output dir.
+
+    SECURITY: hook commands come from an *untrusted* template manifest and are
+    arbitrary code. The protection boundary is **explicit user consent** enforced
+    by the caller (the CLI prompts before this function is ever reached) — not
+    argument parsing. Never call this with hooks the user has not approved.
     """
     cwd = Path(cwd)
     for hook in planned:
@@ -45,7 +51,7 @@ def run_hooks(planned: list, cwd: Path, *, echo=None) -> None:
         if echo is not None:
             echo(hook)
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B602 - by design; gated behind explicit consent
                 hook.command,
                 shell=True,
                 cwd=str(cwd),

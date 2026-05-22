@@ -86,11 +86,21 @@ def generate(
     git_ref: str | None = None,
     prompter: Prompter | None = None,
     hook_echo: Callable | None = None,
+    hook_consent: Callable | None = None,
 ) -> GenerationResult:
     """Generate a project from *ref* into *dest*.
 
     Composition: every template in the ``extends`` chain is rendered in order
     into the same destination, sharing one variable context.
+
+    SECURITY — post-generation hooks run arbitrary shell commands from the
+    (untrusted) template manifest. They run only when *both* ``run_post_hooks``
+    is true *and* ``hook_consent`` (if provided) returns truthy for the planned
+    hooks. ``hook_consent`` is called as ``hook_consent(planned_hooks)`` after the
+    project is written but before any command executes. If ``hook_consent`` is
+    ``None`` the legacy behavior (run when ``run_post_hooks``) applies — callers
+    that handle untrusted input MUST pass a consent callback (the shipped CLI
+    always does).
     """
     dest = Path(dest)
     env = make_environment()
@@ -155,7 +165,12 @@ def generate(
         write_plan(combined, dest)
 
         if run_post_hooks and planned_hooks:
-            run_hooks(planned_hooks, dest, echo=hook_echo)
+            runnable = [h for h in planned_hooks if h.will_run]
+            consented = True
+            if runnable and hook_consent is not None:
+                consented = bool(hook_consent(runnable))
+            if consented:
+                run_hooks(planned_hooks, dest, echo=hook_echo)
 
         return GenerationResult(
             dest=dest,

@@ -66,7 +66,8 @@ class Manifest:
     @property
     def template_dir(self) -> Path:
         """Directory whose contents are rendered into the destination."""
-        assert self.root is not None
+        if self.root is None:
+            raise ManifestError("Manifest has no resolved root directory.")
         nested = self.root / TEMPLATE_DIR_NAME
         return nested if nested.is_dir() else self.root
 

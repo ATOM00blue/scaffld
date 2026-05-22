@@ -121,6 +121,29 @@ def test_hooks_can_be_disabled(make_template, tmp_path):
     assert not (dest / "hooked.txt").exists()
 
 
+def test_hook_consent_callback_declined(make_template, tmp_path):
+    """A consent callback returning False blocks hooks but still writes files."""
+    root = make_template(manifest=_hook_manifest(tmp_path), files={"template/a.txt": "x"})
+    dest = tmp_path / "out"
+    seen = {}
+
+    def deny(planned):
+        seen["count"] = len(planned)
+        return False
+
+    generate(str(root), dest, no_input=True, hook_consent=deny)
+    assert (dest / "a.txt").exists()
+    assert not (dest / "hooked.txt").exists()
+    assert seen["count"] == 1
+
+
+def test_hook_consent_callback_granted(make_template, tmp_path):
+    root = make_template(manifest=_hook_manifest(tmp_path), files={"template/a.txt": "x"})
+    dest = tmp_path / "out"
+    generate(str(root), dest, no_input=True, hook_consent=lambda planned: True)
+    assert (dest / "hooked.txt").exists()
+
+
 def test_describe(make_template):
     root = make_template(
         manifest="name: described\ndescription: a thing\nvariables:\n  x: hi\n",

@@ -119,13 +119,27 @@ def _resolve_git(ref: str, git_ref: str | None) -> ResolvedTemplate:
             "git is required to fetch templates from a URL but was not found on PATH."
         )
 
+    # Argument-injection hardening (CWE-88): a URL/ref/subdir starting with '-'
+    # could be misread by git as an option. Reject those, and use '--' to end
+    # option parsing so positionals can never be treated as flags.
+    if url.startswith("-"):
+        raise TemplateNotFoundError(f"Refusing to clone a URL that starts with '-': {url}")
+    if git_ref is not None and git_ref.startswith("-"):
+        raise TemplateNotFoundError(
+            f"Refusing to use a git ref that starts with '-': {git_ref}"
+        )
+    if subdir.startswith("-") or subdir.startswith("/") or ".." in subdir.split("/"):
+        raise TemplateNotFoundError(
+            f"Refusing to use an unsafe subdir reference: '{subdir}'"
+        )
+
     tmp = Path(tempfile.mkdtemp(prefix="scaffld-"))
     cmd = ["git", "clone", "--depth", "1"]
     if git_ref:
         cmd += ["--branch", git_ref]
-    cmd += [url, str(tmp)]
+    cmd += ["--", url, str(tmp)]
     try:
-        subprocess.run(
+        subprocess.run(  # nosec B603 - argv list (no shell); inputs validated above
             cmd,
             check=True,
             capture_output=True,

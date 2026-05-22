@@ -27,6 +27,15 @@ class RenderError(ScaffldError):
     """A Jinja2 template (file name or content) failed to render."""
 
 
+class PathTraversalError(ScaffldError):
+    """A rendered output path tried to escape the destination directory.
+
+    Raised when a template file/dir name (or skip path) resolves to an absolute
+    path, contains a ``..`` segment, or otherwise points outside the destination
+    (the ZIP-SLIP / path-traversal class of attack).
+    """
+
+
 class HookError(ScaffldError):
     """A post-generation hook failed to run."""
 

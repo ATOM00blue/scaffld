@@ -3,15 +3,56 @@
 from __future__ import annotations
 
 import dataclasses
+import ntpath
 import os
 from fnmatch import fnmatch
 from pathlib import Path, PurePosixPath
 
 import jinja2
+from jinja2.sandbox import SandboxedEnvironment
 
-from .errors import RenderError
+from .errors import PathTraversalError, RenderError
 
 RENDER_SUFFIXES = (".jinja", ".j2")
+
+
+def _safe_relative(rel: str, *, where: str) -> PurePosixPath:
+    """Validate that *rel* is a safe, destination-confined relative path.
+
+    Template authors are untrusted, so a rendered file/dir name (or skip path)
+    must never escape the destination directory. This rejects:
+
+    * absolute POSIX paths (``/etc/x``);
+    * Windows drive-relative / drive-absolute paths (``C:\\x``, ``C:x``);
+    * UNC paths (``\\\\host\\share``);
+    * any path containing a ``..`` segment;
+    * empty or ``.``-only segments.
+
+    Returns the normalized :class:`PurePosixPath`. Raises
+    :class:`PathTraversalError` otherwise. This is the single choke point for the
+    ZIP-SLIP / path-traversal class of attack (CWE-22/23).
+    """
+    raw = str(rel)
+    # Normalize separators so a Windows-style "..\\x" is caught too.
+    candidate = raw.replace("\\", "/")
+
+    # Absolute POSIX path, or Windows drive / UNC forms.
+    if candidate.startswith("/") or ntpath.isabs(raw) or ntpath.splitdrive(raw)[0]:
+        raise PathTraversalError(
+            f"Refusing to write outside the destination: {where} resolves to an "
+            f"absolute path '{raw}'."
+        )
+
+    parts = [p for p in candidate.split("/") if p not in ("", ".")]
+    if any(p == ".." for p in parts):
+        raise PathTraversalError(
+            f"Refusing to write outside the destination: {where} contains a '..' "
+            f"segment ('{raw}')."
+        )
+    if not parts:
+        # Nothing meaningful to write (e.g. "." or ""): treat as empty.
+        return PurePosixPath()
+    return PurePosixPath(*parts)
 
 
 def _slugify(value: str, sep: str = "-") -> str:
@@ -40,8 +81,18 @@ def _pascal(value: str) -> str:
 
 
 def make_environment() -> jinja2.Environment:
-    """Create the shared Jinja2 environment with scaffld's custom filters."""
-    env = jinja2.Environment(
+    """Create the shared Jinja2 environment with scaffld's custom filters.
+
+    Uses a :class:`~jinja2.sandbox.SandboxedEnvironment` because template authors
+    are untrusted (templates are fetched from arbitrary git URLs). The sandbox
+    blocks the standard SSTI escape chain (``__class__``/``__mro__``/
+    ``__globals__`` etc.), preventing arbitrary code execution at render time.
+
+    ``autoescape`` is intentionally ``False``: scaffld generates source code,
+    TOML/YAML/INI, Dockerfiles, etc., where HTML escaping would corrupt output.
+    Autoescaping is not the injection control here — the sandbox is.
+    """
+    env = SandboxedEnvironment(  # nosec B701 - codegen output; sandbox is the SSTI control
         undefined=jinja2.StrictUndefined,
         keep_trailing_newline=True,
         autoescape=False,
@@ -143,8 +194,14 @@ def build_plan(
         rendered_rel_parts: list = []
         for part in rel_root.parts:
             rendered = render_string(env, part, context, where=f"dir name '{part}'")
-            rendered_rel_parts.append(rendered)
-        rendered_rel = PurePosixPath(*rendered_rel_parts) if rendered_rel_parts else PurePosixPath()
+            # A rendered dir segment must itself be a single safe segment.
+            safe_seg = _safe_relative(rendered, where=f"dir name '{part}'")
+            rendered_rel_parts.append(safe_seg.as_posix())
+        rendered_rel = (
+            _safe_relative("/".join(rendered_rel_parts), where=f"dir path '{rel_root.as_posix()}'")
+            if rendered_rel_parts
+            else PurePosixPath()
+        )
         rendered_rel_str = rendered_rel.as_posix()
 
         # Drop directories whose rendered name is empty (e.g. "{{ '' }}").
@@ -161,11 +218,20 @@ def build_plan(
             )
             if not rendered_name:
                 continue
-            target_name = _strip_render_suffix(rendered_name)
-            had_render_suffix = target_name != rendered_name
+            # A rendered file name must be a single safe segment (no traversal,
+            # not absolute, no embedded separators escaping the dir).
+            safe_name = _safe_relative(
+                rendered_name, where=f"file name '{filename}'"
+            ).as_posix()
+            if not safe_name:
+                continue
+            target_name = _strip_render_suffix(safe_name)
+            had_render_suffix = target_name != safe_name
             rel_target = (
                 (rendered_rel / target_name) if rendered_rel_str not in {"", "."} else PurePosixPath(target_name)
             )
+            # Final defense-in-depth: re-validate the composed relative target.
+            rel_target = _safe_relative(rel_target.as_posix(), where=f"output path '{rel_target.as_posix()}'")
             rel_target_str = rel_target.as_posix()
             if rel_target_str in skip_paths:
                 continue
@@ -221,17 +287,40 @@ def build_plan(
     return plan
 
 
+def _assert_within(dest_real: str, target: Path, *, where: str) -> None:
+    """Ensure *target* resolves inside *dest_real* (realpath containment)."""
+    resolved = os.path.realpath(str(target))
+    # commonpath raises ValueError across drives on Windows — treat as escape.
+    try:
+        common = os.path.commonpath([dest_real, resolved])
+    except ValueError:
+        common = ""
+    if common != dest_real:
+        raise PathTraversalError(
+            f"Refusing to write outside the destination: {where} resolves to "
+            f"'{resolved}', which is outside '{dest_real}'."
+        )
+
+
 def write_plan(plan: RenderPlan, dest: Path) -> list:
-    """Write a :class:`RenderPlan` to *dest*. Returns POSIX paths written."""
+    """Write a :class:`RenderPlan` to *dest*. Returns POSIX paths written.
+
+    Every directory and file path is re-checked with ``realpath`` to guarantee it
+    stays inside *dest* (defense-in-depth on top of :func:`_safe_relative`).
+    """
     dest = Path(dest)
     written: list = []
     dest.mkdir(parents=True, exist_ok=True)
+    dest_real = os.path.realpath(str(dest))
 
     for rel_dir in plan.dirs:
-        (dest / rel_dir).mkdir(parents=True, exist_ok=True)
+        target_dir = dest / rel_dir
+        _assert_within(dest_real, target_dir, where=f"directory '{rel_dir}'")
+        target_dir.mkdir(parents=True, exist_ok=True)
 
     for pf in plan.files:
         target = dest / Path(pf.rel_target)
+        _assert_within(dest_real, target, where=f"file '{pf.rel_target.as_posix()}'")
         target.parent.mkdir(parents=True, exist_ok=True)
         if pf.rendered_content is None:
             # Binary or raw passthrough: copy bytes verbatim.
@@ -250,5 +339,7 @@ def resolve_skip_paths(env: jinja2.Environment, skip_rules: list, context: dict)
             for raw in rule.paths:
                 rendered = render_string(env, raw, context, where=f"skip path '{raw}'")
                 if rendered:
-                    paths.add(PurePosixPath(rendered).as_posix())
+                    safe = _safe_relative(rendered, where=f"skip path '{raw}'").as_posix()
+                    if safe:
+                        paths.add(safe)
     return paths
