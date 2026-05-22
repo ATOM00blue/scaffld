@@ -25,6 +25,13 @@ All notable changes to this project are documented here. The format is based on
   containing `..`.
 - Replaced a bare `assert` (stripped under `python -O`) with an explicit error.
 
+### Fixed
+
+- **Python 3.9 compatibility (CI was failing on 3.9):** the renderer used
+  `Path.write_text(newline=…)` (3.10+) — now writes via `open(newline="")`; and the
+  Typer CLI used `X | None` / `list[str]` annotations that Typer evaluates at runtime
+  and that error on 3.9 — now `typing.Optional`/`List`.
+
 ### Added
 
 - New `--yes`/`-y` flag and an interactive hook-consent prompt.

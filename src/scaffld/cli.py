@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import List, Optional
 
 import typer
 from rich.panel import Panel
@@ -146,10 +147,10 @@ def new(
     template: str = typer.Argument(
         ..., help="Built-in name, local path, or git URL (gh:user/repo, user/repo, https://…)."
     ),
-    dest: Path | None = typer.Argument(
+    dest: Optional[Path] = typer.Argument(
         None, help="Destination directory (default: current directory)."
     ),
-    var: list[str] = typer.Option(
+    var: Optional[List[str]] = typer.Option(
         None, "--var", "-v", help="Set a variable, e.g. --var name=demo. Repeatable.", metavar="KEY=VALUE"
     ),
     no_input: bool = typer.Option(
@@ -170,7 +171,7 @@ def new(
         "-y",
         help="Consent to run post-generation hooks without prompting (I trust this template).",
     ),
-    ref: str | None = typer.Option(
+    ref: Optional[str] = typer.Option(
         None, "--ref", help="Git branch/tag for git URL templates."
     ),
 ) -> None:
@@ -226,7 +227,7 @@ def list_templates() -> None:
 @app.command()
 def info(
     template: str = typer.Argument(..., help="Template name, path, or git URL."),
-    ref: str | None = typer.Option(None, "--ref", help="Git branch/tag for git templates."),
+    ref: Optional[str] = typer.Option(None, "--ref", help="Git branch/tag for git templates."),
 ) -> None:
     """Show a template's variables and hooks."""
     try:

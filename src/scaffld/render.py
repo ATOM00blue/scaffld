@@ -326,7 +326,11 @@ def write_plan(plan: RenderPlan, dest: Path) -> list:
             # Binary or raw passthrough: copy bytes verbatim.
             target.write_bytes(pf.source.read_bytes())
         else:
-            target.write_text(pf.rendered_content, encoding="utf-8", newline="")
+            # newline="" disables newline translation so rendered content is
+            # written verbatim. Path.write_text() only accepts ``newline`` on
+            # Python 3.10+, so open() the file explicitly for 3.9 compatibility.
+            with target.open("w", encoding="utf-8", newline="") as fh:
+                fh.write(pf.rendered_content)
         written.append(pf.rel_target.as_posix())
     return written
 

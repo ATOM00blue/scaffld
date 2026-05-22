@@ -90,4 +90,7 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["B011"]
 # Typer requires calling typer.Option/Argument in parameter defaults (B008).
-"src/scaffld/cli.py" = ["B008"]
+# Typer also evaluates annotations at runtime (get_type_hints), so on Python 3.9
+# we must use typing.Optional/List rather than the X | None / list[...] syntax
+# that pyupgrade (UP) rules would otherwise enforce. Ignore those here.
+"src/scaffld/cli.py" = ["B008", "UP006", "UP007", "UP035", "UP045"]
